@@ -190,10 +190,19 @@ async function callAppsScript(body) {
 // ─── LINE Reply ───────────────────────────────────────────────
 
 async function linePush(token, userId, text) {
-  if (!token || !userId) return;
-  await fetch('https://api.line.me/v2/bot/message/push', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-    body: JSON.stringify({ to: userId, messages: [{ type: 'text', text }] })
-  }).catch(e => console.error('push error:', e.message));
+  if (!token || !userId) {
+    console.log('linePush skip: token=' + !!token + ' userId=' + userId);
+    return;
+  }
+  try {
+    const r = await fetch('https://api.line.me/v2/bot/message/push', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ to: userId, messages: [{ type: 'text', text }] })
+    });
+    const body = await r.text();
+    console.log('push status:', r.status, body);
+  } catch (e) {
+    console.error('push error:', e.message);
+  }
 }
