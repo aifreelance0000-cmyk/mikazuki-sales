@@ -1,6 +1,6 @@
 // Vercel Serverless Function — 売上管理 LINE Webhook
 
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzRQs0ezf05NlxkeQc3FZq6h1bsF98v8PuqXdEZzSqIeKDa66xwGQEl7_pPYuC_JXBE/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz11I4zO4G9jbIX9JGJ18LxIr6Q-Kg5FbPwgnlQ2FeZ-2036PGRib_X82yLGQ1snJqo/exec';
 
 // body を確実に JSON オブジェクトとして取得
 async function readBody(req) {
