@@ -562,6 +562,10 @@ function renderShokaiMonth(ym) {
     return;
   }
 
+  const normalRows = rows.filter(r => (r['タイプ'] || '通常') !== 'クーリングオフ');
+  const cashTotal   = normalRows.reduce((s, r) => s + Number(r['振込金額']  || 0), 0);
+  const creditTotal = normalRows.reduce((s, r) => s + Number(r['クレカ金額'] || 0), 0);
+
   const items = rows.map(r => {
     const isCO = (r['タイプ'] || '通常') === 'クーリングオフ';
     const amt = Number(r['金額'] || 0);
@@ -589,7 +593,17 @@ function renderShokaiMonth(ym) {
     <div class="card">
       <div class="card-label">月間売上</div>
       <div class="card-amount">${total < 0 ? '-' : ''}${yen(total)}</div>
-      <div style="font-size:12px;color:var(--text2);margin-top:4px">${rows.length} 件</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px;margin-bottom:14px">${rows.length} 件</div>
+      <div class="pay-row">
+        <div class="pay-item cash">
+          <div class="pay-label">銀行振込</div>
+          <div class="pay-amt">${yen(cashTotal)}</div>
+        </div>
+        <div class="pay-item credit">
+          <div class="pay-label">クレジットカード</div>
+          <div class="pay-amt">${yen(creditTotal)}</div>
+        </div>
+      </div>
     </div>
     ${items}`;
 }
