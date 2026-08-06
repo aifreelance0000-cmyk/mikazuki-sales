@@ -117,7 +117,41 @@ module.exports = async function handler(req, res) {
           await linePush(token, userId, header + '\n\n' + lines.join('\n'));
 
         } else {
-          await linePush(token, userId, '売上登録は ■紹介者：〇〇 から始まる形式で送信してください。');
+          // 名前だけ送ると受託売上の個人集計を返す
+          const name = text.trim();
+          let replied = false;
+          if (name && name.length <= 20) {
+            try {
+              const r   = await callAppsScript({ action: 'getJutakuStats', name });
+              const txt = await r.text();
+              const res = JSON.parse(txt);
+              if (res.success && res.count > 0) {
+                const now = new Date();
+                const pad = n => String(n).padStart(2, '0');
+                const ym = `${now.getFullYear()}年${now.getMonth() + 1}月`;
+                const lm = now.getMonth() === 0
+                  ? `${now.getFullYear() - 1}年12月`
+                  : `${now.getFullYear()}年${now.getMonth()}月`;
+                const msg = [
+                  `🌙 ${name} さんの受託売上`,
+                  ``,
+                  `📅 今月（${ym}）`,
+                  `　売上：${yen(res.thisMonth)}　${res.thisMonthCount}件`,
+                  `📅 前月（${lm}）`,
+                  `　売上：${yen(res.lastMonth)}　${res.lastMonthCount}件`,
+                  `💰 累計売上：${yen(res.total)}`,
+                  `📦 納品件数：${res.count}件`,
+                ].join('\n');
+                await linePush(token, userId, msg);
+                replied = true;
+              }
+            } catch (e) {
+              console.error('stats error:', e.message);
+            }
+          }
+          if (!replied) {
+            await linePush(token, userId, '名前を送ると受託売上を確認できます。\n売上登録は ■紹介者：〇〇 の形式で送信してください。');
+          }
         }
       } catch (err) {
         console.error('event error:', err);
