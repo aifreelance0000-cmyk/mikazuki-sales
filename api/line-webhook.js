@@ -39,6 +39,8 @@ module.exports = async function handler(req, res) {
       const replyToken = event.replyToken;
 
       try {
+        const msgId = event.message.id; // LINE メッセージID（重複防止用）
+
         if (/[■◾]/.test(text) && /紹介者/.test(text)) {
           // 商材売上登録
           const entries = parseSalesMessage(text, false);
@@ -49,7 +51,7 @@ module.exports = async function handler(req, res) {
           let saved = 0;
           const lines = [];
           for (const entry of entries) {
-            await callAppsScript({ action: 'addShokaiSale', ...entry });
+            await callAppsScript({ action: 'addShokaiSale', ...entry, _msgId: msgId });
             saved++;
             lines.push(`✅ ${entry.登録者名}  ${yen(entry.金額)}`);
           }
