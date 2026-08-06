@@ -6,26 +6,12 @@
 
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzRQs0ezf05NlxkeQc3FZq6h1bsF98v8PuqXdEZzSqIeKDa66xwGQEl7_pPYuC_JXBE/exec';
 
-module.exports.config = { api: { bodyParser: false } };
-
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(200).json({ status: 'ok' });
 
-  const rawBody = await new Promise((resolve, reject) => {
-    let d = '';
-    req.on('data',  c => { d += c.toString('utf8'); });
-    req.on('end',   () => resolve(d));
-    req.on('error', reject);
-  });
-
-  let parsed;
-  try {
-    parsed = JSON.parse(rawBody);
-  } catch (e) {
-    return res.status(200).end();
-  }
-
-  if (!parsed.events || parsed.events.length === 0) return res.status(200).end();
+  // Vercel は JSON body を自動パース済み。req.body をそのまま使う
+  const parsed = req.body;
+  if (!parsed || !parsed.events || parsed.events.length === 0) return res.status(200).end();
 
   // LINE に 200 を先に返す（タイムアウト回避）
   res.status(200).end();
