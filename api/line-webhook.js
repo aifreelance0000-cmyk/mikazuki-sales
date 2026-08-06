@@ -1,11 +1,10 @@
 // Vercel Serverless Function — 売上管理 LINE Webhook
 //
 // 対応メッセージ:
-//   ◾️紹介者 から始まる商材売上登録
-//   ⚠️クーリングオフのご報告⚠️ から始まるCO登録
-//   ※受託売上は別途フォーマット確定後に追加
+//   ■紹介者：〇〇 から始まる商材売上登録
+//   クーリングオフ を含むCO登録
 
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxQRESnVJ9NW_VTCs07g9iK7lsIURJBD4nIdA_4yQi8_5sS2dSEVi0vzOkCEaJcz_U/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzRQs0ezf05NlxkeQc3FZq6h1bsF98v8PuqXdEZzSqIeKDa66xwGQEl7_pPYuC_JXBE/exec';
 
 module.exports.config = { api: { bodyParser: false } };
 
@@ -40,10 +39,10 @@ module.exports = async function handler(req, res) {
     const replyToken = event.replyToken;
 
     // 商材売上 / クーリングオフ
-    if (/◾[️]?紹介者/.test(text) || /クーリングオフ/.test(text)) {
+    if (isSalesMessage(text) || /クーリングオフ/.test(text)) {
       const entries = parseSalesMessage(text);
       if (!entries.length) {
-        await lineReply(token, replyToken, '⚠️ フォーマットが認識できませんでした。\n◾️紹介者 から始まる形式で送信してください。');
+        await lineReply(token, replyToken, '⚠️ フォーマットが認識できませんでした。\n■紹介者：〇〇 から始まる形式で送信してください。');
         continue;
       }
 
@@ -68,9 +67,17 @@ module.exports = async function handler(req, res) {
     }
 
     // 未対応フォーマット
-    await lineReply(token, replyToken, '売上登録は ◾️紹介者 から始まる形式で送信してください。');
+    await lineReply(token, replyToken, '売上登録は ■紹介者：〇〇 から始まる形式で送信してください。');
   }
 };
+
+// ────────────────────────────────────────────
+//  Sales Message Detection
+// ────────────────────────────────────────────
+function isSalesMessage(text) {
+  // ■紹介者 or ◾️紹介者（どちらの■でも対応）
+  return /[■◾].*紹介者/.test(text) || /紹介者[：:]/.test(text);
+}
 
 // ────────────────────────────────────────────
 //  LINE Message Parser
@@ -79,14 +86,14 @@ function parseSalesMessage(text) {
   const isCO = /クーリングオフ/.test(text);
   const type = isCO ? 'クーリングオフ' : '通常';
 
-  // ◾️紹介者 が現れるたびに新エントリー開始
+  // ■紹介者 または ◾️紹介者 が現れるたびに新エントリー開始
   const lineArr = text.split('\n');
   const parts = [];
   let buf = [];
   let started = false;
 
   for (const line of lineArr) {
-    if (/◾[️]?紹介者/.test(line)) {
+    if (/[■◾].*紹介者/.test(line) || (/紹介者[：:]/.test(line) && !started)) {
       if (started && buf.length) parts.push(buf.join('\n'));
       buf = [line];
       started = true;
@@ -105,48 +112,44 @@ function parseEntry(text, type) {
   let 金額 = 0, 入金日 = '';
   let クレカ金額 = 0, 振込金額 = 0;
   const methods = [];
-  let state = '';
 
   for (const raw of lines) {
     const line = raw.trim();
     if (!line) continue;
 
-    if (/◾[️]?紹介者/.test(line))                                 { state = '紹介者'; continue; }
-    if (/登録者様のフルネーム|フルネーム/.test(line))              { state = '登録者'; continue; }
-    if (/◾[️]?金額/.test(line))                                   { state = '金額';   continue; }
-    if (/入金日/.test(line))                                       { state = '入金日'; continue; }
-    if (/決済方法/.test(line))                                     { state = '決済';   continue; }
+    // コロン（：全角 or :半角）で key/value を分割
+    const colonIdx = line.search(/[：:]/);
+    if (colonIdx === -1) continue;
 
-    switch (state) {
-      case '紹介者':
-        紹介者 = line.replace(/さん$/, '').trim();
-        state = '';
-        break;
-      case '登録者': {
-        const m = line.match(/^(.+?)[（(](.+?)[）)]/);
-        if (m) { 登録者名 = m[1].trim(); 登録者ふりがな = m[2].trim(); }
-        else     登録者名 = line.trim();
-        state = '';
-        break;
-      }
-      case '金額':
-        金額 = parseAmt(line);
-        state = '';
-        break;
-      case '入金日':
-        入金日 = parseDt(line);
-        state = '';
-        break;
-      case '決済': {
-        const p = parsePayment(line);
-        if (p.method) {
-          methods.push(p.method);
-          if (p.isCredit) クレカ金額 += p.amount;
-          else            振込金額   += p.amount;
-        }
-        break;
+    const key = line.slice(0, colonIdx).replace(/^[■◾️◾・\s]+/, '').trim();
+    const val = line.slice(colonIdx + 1).trim();
+    if (!val) continue;
+
+    if      (/紹介者/.test(key))                       紹介者 = val.replace(/さん$/, '').trim();
+    else if (/登録者名|氏名|フルネーム/.test(key))     {
+      const m = val.match(/^(.+?)[（(](.+?)[）)]/);
+      if (m) { 登録者名 = m[1].trim(); 登録者ふりがな = m[2].trim(); }
+      else     登録者名 = val.trim();
+    }
+    else if (/ふりがな|フリガナ/.test(key))            登録者ふりがな = val.trim();
+    else if (/金額/.test(key))                         金額 = parseAmt(val);
+    else if (/入金日/.test(key))                       入金日 = parseDt(val);
+    else if (/決済/.test(key)) {
+      const p = parsePayment(val);
+      if (p.method) {
+        methods.push(p.method);
+        if (p.isCredit) クレカ金額 += p.amount;
+        else            振込金額   += p.amount;
       }
     }
+  }
+
+  // 金額だけ指定して内訳がない場合、決済方法に応じて自動セット
+  if (金額 > 0 && クレカ金額 === 0 && 振込金額 === 0) {
+    const hasCredit = methods.some(m => /クレジット|クレカ|カード/.test(m));
+    const hasBank   = methods.some(m => /銀行|振込/.test(m));
+    if (hasCredit && !hasBank) クレカ金額 = 金額;
+    if (hasBank   && !hasCredit) 振込金額 = 金額;
   }
 
   const 決済方法 = [...new Set(methods)].join('・');
