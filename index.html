@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>売上管理</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #0f172a;
+      --bg2:     #1e293b;
+      --bg3:     #334155;
+      --text:    #f1f5f9;
+      --text2:   #94a3b8;
+      --green:   #10b981;
+      --blue:    #3b82f6;
+      --orange:  #f59e0b;
+      --red:     #ef4444;
+      --border:  #334155;
+      --r:       12px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic', sans-serif;
+      min-height: 100vh;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    /* ── Header ── */
+    .hdr {
+      position: sticky; top: 0;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 18px;
+      display: flex; align-items: center; gap: 10px;
+      z-index: 100;
+    }
+    .hdr h1 { font-size: 17px; font-weight: 700; }
+    .back-btn {
+      background: none; border: none;
+      color: var(--blue); font-size: 16px;
+      cursor: pointer; padding: 2px 6px;
+      display: none; flex-shrink: 0;
+    }
+    .back-btn.show { display: block; }
+    .reload-btn {
+      margin-left: auto;
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text2);
+      font-size: 13px;
+      cursor: pointer;
+      padding: 5px 12px;
+      border-radius: 8px;
+      flex-shrink: 0;
+    }
+    .reload-btn:active { opacity: 0.7; }
+
+    /* ── Layout ── */
+    .main { padding: 18px; }
+
+    /* ── Screen routing ── */
+    .screen { display: none; }
+    .screen.active { display: block; }
+
+    /* ── Loading / Error ── */
+    .loading {
+      display: flex; align-items: center; justify-content: center;
+      gap: 10px; padding: 60px 20px;
+      color: var(--text2); font-size: 14px;
+    }
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid var(--bg3);
+      border-top-color: var(--green);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .err-box {
+      background: rgba(239,68,68,.1);
+      border: 1px solid var(--red);
+      color: var(--red);
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 16px;
+      font-size: 13px;
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--bg2);
+      border-radius: var(--r);
+      padding: 20px;
+      margin-bottom: 14px;
+    }
+    .card-label {
+      font-size: 12px; color: var(--text2);
+      margin-bottom: 6px; letter-spacing: .03em;
+    }
+    .card-amount { font-size: 32px; font-weight: 800; }
+
+    /* ── Total hero card ── */
+    .hero {
+      background: linear-gradient(135deg, #10b981, #059669);
+      border-radius: var(--r);
+      padding: 24px 20px;
+      margin-bottom: 14px;
+    }
+    .hero .card-label { color: rgba(255,255,255,.8); }
+    .hero .card-amount { font-size: 38px; }
+
+    /* ── Section link cards ── */
+    .sec-card {
+      background: var(--bg2);
+      border-radius: var(--r);
+      padding: 20px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      display: flex; align-items: center;
+      transition: background .12s;
+    }
+    .sec-card:hover { background: var(--bg3); }
+    .sec-card:active { transform: scale(.98); }
+    .sec-info { flex: 1; }
+    .sec-label { font-size: 12px; color: var(--text2); margin-bottom: 4px; }
+    .sec-amount { font-size: 28px; font-weight: 700; }
+    .sec-sub { font-size: 12px; color: var(--text2); margin-top: 4px; }
+    .chevron { color: var(--text2); font-size: 22px; margin-left: 10px; }
+
+    /* ── Detail total + current month ── */
+    .month-card {
+      background: var(--bg2);
+      border-radius: var(--r);
+      padding: 20px;
+      margin-bottom: 14px;
+    }
+    .month-title { font-size: 13px; color: var(--text2); margin-bottom: 10px; }
+    .month-total { font-size: 28px; font-weight: 700; margin-bottom: 14px; }
+    .pay-row { display: flex; gap: 10px; }
+    .pay-item {
+      flex: 1;
+      background: var(--bg3);
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .pay-label { font-size: 11px; color: var(--text2); margin-bottom: 4px; }
+    .pay-amt { font-size: 17px; font-weight: 600; }
+    .pay-item.cash .pay-amt { color: var(--blue); }
+    .pay-item.credit .pay-amt { color: var(--orange); }
+
+    /* ── Monthly scroll ── */
+    .month-scroll-wrap { margin-bottom: 14px; }
+    .month-scroll-label {
+      font-size: 13px; color: var(--text2);
+      margin-bottom: 10px;
+    }
+    .month-scroll {
+      overflow-x: auto;
+      display: flex; gap: 8px;
+      padding-bottom: 6px;
+      scroll-snap-type: x mandatory;
+    }
+    .month-scroll::-webkit-scrollbar { height: 3px; }
+    .month-scroll::-webkit-scrollbar-track { background: var(--bg2); }
+    .month-scroll::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 2px; }
+    .mo-block {
+      min-width: 100px;
+      background: var(--bg2);
+      border-radius: 10px;
+      padding: 12px 10px;
+      cursor: pointer; flex-shrink: 0;
+      scroll-snap-align: start;
+      transition: background .12s;
+      border: 1.5px solid transparent;
+    }
+    .mo-block:hover { background: var(--bg3); }
+    .mo-block:active { transform: scale(.97); }
+    .mo-block.cur { border-color: var(--green); }
+    .mo-name { font-size: 12px; color: var(--text2); margin-bottom: 6px; }
+    .mo-amt { font-size: 17px; font-weight: 700; }
+    .mo-meta { font-size: 11px; color: var(--text2); margin-top: 4px; }
+
+    /* ── Sale list items ── */
+    .sale-item {
+      background: var(--bg2);
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 8px;
+    }
+    .sale-item.co { border-left: 3px solid var(--red); }
+    .sale-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+    .sale-name { font-size: 15px; font-weight: 600; }
+    .sale-amt { font-size: 15px; font-weight: 700; color: var(--green); flex-shrink: 0; }
+    .sale-item.co .sale-amt { color: var(--red); }
+    .sale-meta { font-size: 12px; color: var(--text2); margin-top: 8px; line-height: 1.6; }
+    .co-badge {
+      display: inline-block;
+      background: var(--red); color: #fff;
+      font-size: 10px; font-weight: 700;
+      padding: 1px 6px; border-radius: 4px;
+      margin-left: 6px; vertical-align: middle;
+    }
+
+    /* ── Divider ── */
+    .section-hd {
+      font-size: 12px; color: var(--text2);
+      margin: 18px 0 8px;
+      letter-spacing: .05em;
+    }
+  </style>
+</head>
+<body>
+
+<div class="hdr">
+  <button class="back-btn" id="backBtn" onclick="goBack()">← 戻る</button>
+  <h1 id="pageTitle">売上管理</h1>
+  <button class="reload-btn" onclick="loadData()">↻ 更新</button>
+</div>
+
+<!-- Dashboard -->
+<div class="screen active" id="screen-dash">
+  <div class="main" id="dash-inner">
+    <div class="loading"><div class="spinner"></div>読み込み中...</div>
+  </div>
+</div>
+
+<!-- 商材売上 Detail -->
+<div class="screen" id="screen-shokai">
+  <div class="main" id="shokai-inner">
+    <div class="loading"><div class="spinner"></div>読み込み中...</div>
+  </div>
+</div>
+
+<!-- 受託売上 Detail -->
+<div class="screen" id="screen-jutaku">
+  <div class="main" id="jutaku-inner">
+    <div class="loading"><div class="spinner"></div>読み込み中...</div>
+  </div>
+</div>
+
+<!-- 月次 Detail -->
+<div class="screen" id="screen-month">
+  <div class="main" id="month-inner">
+    <div class="loading"><div class="spinner"></div>読み込み中...</div>
+  </div>
+</div>
+
+<script>
+const PROXY = '/api/proxy';
+let data = null;
+let view = 'dash';
+let monthCtx = null; // { type, ym }
+
+// ────────────────────────────────────────────
+//  Utility
+// ────────────────────────────────────────────
+function yen(n) {
+  if (n === null || n === undefined || isNaN(n)) return '¥0';
+  const abs = Math.abs(Number(n));
+  return '¥' + abs.toLocaleString('ja-JP');
+}
+
+function getYM(dateVal) {
+  if (!dateVal) return '';
+  let d;
+  if (typeof dateVal === 'string') {
+    if (/^\d{4}-\d{2}-\d{2}/.test(dateVal)) {
+      d = new Date(dateVal.substring(0, 10) + 'T00:00:00');
+    } else {
+      d = new Date(dateVal);
+    }
+  } else {
+    d = new Date(dateVal);
+  }
+  if (isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function nowYM() {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function ymLabel(ym) {
+  if (!ym) return '';
+  const [y, m] = ym.split('-');
+  return `${y}年${parseInt(m)}月`;
+}
+
+function shokaiSign(row) {
+  return (row['タイプ'] || '通常') === 'クーリングオフ' ? -1 : 1;
+}
+
+function shokaiAmt(row) {
+  return Number(row['金額'] || 0) * shokaiSign(row);
+}
+
+// ────────────────────────────────────────────
+//  API
+// ────────────────────────────────────────────
+async function loadData() {
+  setLoading();
+  try {
+    const res = await fetch(PROXY, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'getSalesData' })
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'API error');
+    data = json;
+    renderView();
+  } catch (e) {
+    showErr('データ取得エラー: ' + e.message);
+  }
+}
+
+function setLoading() {
+  ['dash', 'shokai', 'jutaku', 'month'].forEach(id => {
+    const el = document.getElementById(id + '-inner');
+    if (el) el.innerHTML = '<div class="loading"><div class="spinner"></div>読み込み中...</div>';
+  });
+}
+
+function showErr(msg) {
+  document.getElementById(view + '-inner').innerHTML = `<div class="err-box">⚠️ ${msg}</div>`;
+}
+
+// ────────────────────────────────────────────
+//  Routing
+// ────────────────────────────────────────────
+function switchScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + name).classList.add('active');
+  view = name;
+
+  const back = document.getElementById('backBtn');
+  const title = document.getElementById('pageTitle');
+
+  if (name === 'dash') {
+    back.classList.remove('show');
+    title.textContent = '売上管理';
+  } else if (name === 'shokai') {
+    back.classList.add('show');
+    title.textContent = '商材売上';
+  } else if (name === 'jutaku') {
+    back.classList.add('show');
+    title.textContent = '受託売上';
+  } else if (name === 'month') {
+    back.classList.add('show');
+    title.textContent = monthCtx ? ymLabel(monthCtx.ym) : '月次詳細';
+  }
+  window.scrollTo(0, 0);
+}
+
+function goBack() {
+  if (view === 'month' && monthCtx) {
+    switchScreen(monthCtx.type);
+    renderView();
+  } else {
+    switchScreen('dash');
+    renderView();
+  }
+}
+
+function renderView() {
+  if (view === 'dash')   renderDash();
+  if (view === 'shokai') renderShokai();
+  if (view === 'jutaku') renderJutaku();
+  if (view === 'month')  renderMonth();
+}
+
+function navShokai() { switchScreen('shokai'); if (data) renderShokai(); else loadData(); }
+function navJutaku()  { switchScreen('jutaku'); if (data) renderJutaku(); else loadData(); }
+function navMonth(type, ym) {
+  monthCtx = { type, ym };
+  switchScreen('month');
+  if (data) renderMonth(); else loadData();
+}
+
+// ────────────────────────────────────────────
+//  Dashboard
+// ────────────────────────────────────────────
+function renderDash() {
+  if (!data) return;
+  const shokai = data.shokai || [];
+  const jutaku = data.jutaku || [];
+
+  const shokaiTotal = shokai.reduce((s, r) => s + shokaiAmt(r), 0);
+  const jutakuTotal = jutaku.reduce((s, r) => s + Number(r['案件単価'] || 0), 0);
+  const grand = shokaiTotal + jutakuTotal;
+
+  const shokaiCount = shokai.filter(r => (r['タイプ'] || '通常') !== 'クーリングオフ').length;
+  const jutakuCount = jutaku.length;
+
+  document.getElementById('dash-inner').innerHTML = `
+    <div class="hero">
+      <div class="card-label">総合売上</div>
+      <div class="card-amount">${yen(grand)}</div>
+    </div>
+    <div class="sec-card" onclick="navShokai()">
+      <div class="sec-info">
+        <div class="sec-label">商材売上</div>
+        <div class="sec-amount">${yen(shokaiTotal)}</div>
+        <div class="sec-sub">${shokaiCount} 件</div>
+      </div>
+      <div class="chevron">›</div>
+    </div>
+    <div class="sec-card" onclick="navJutaku()">
+      <div class="sec-info">
+        <div class="sec-label">受託売上</div>
+        <div class="sec-amount">${yen(jutakuTotal)}</div>
+        <div class="sec-sub">${jutakuCount} 件</div>
+      </div>
+      <div class="chevron">›</div>
+    </div>
+  `;
+}
+
+// ────────────────────────────────────────────
+//  商材売上 Detail
+// ────────────────────────────────────────────
+function buildShokaiMonths(rows) {
+  const cur = nowYM();
+  const now = new Date();
+  const year = now.getFullYear();
+  const months = [];
+  for (let m = now.getMonth() + 1; m >= 1; m--) {
+    const ym = `${year}-${String(m).padStart(2, '0')}`;
+    const mrs = rows.filter(r => getYM(r['入金日'] || r['登録日時']) === ym);
+    const total = mrs.reduce((s, r) => s + shokaiAmt(r), 0);
+    const count = mrs.filter(r => (r['タイプ'] || '通常') !== 'クーリングオフ').length;
+    const co = mrs.filter(r => (r['タイプ'] || '通常') === 'クーリングオフ').length;
+    months.push({ ym, label: `${m}月`, total, count, co, isCur: ym === cur });
+  }
+  return months;
+}
+
+function renderShokai() {
+  if (!data) return;
+  const rows = data.shokai || [];
+  const total = rows.reduce((s, r) => s + shokaiAmt(r), 0);
+
+  const cur = nowYM();
+  const curRows = rows.filter(r => getYM(r['入金日'] || r['登録日時']) === cur);
+  const curTotal = curRows.reduce((s, r) => s + shokaiAmt(r), 0);
+  const curCash = curRows.filter(r => (r['タイプ'] || '通常') !== 'クーリングオフ')
+                         .reduce((s, r) => s + Number(r['振込金額'] || 0), 0);
+  const curCredit = curRows.filter(r => (r['タイプ'] || '通常') !== 'クーリングオフ')
+                           .reduce((s, r) => s + Number(r['クレカ金額'] || 0), 0);
+
+  const months = buildShokaiMonths(rows);
+  const mblocks = months.map(m => `
+    <div class="mo-block ${m.isCur ? 'cur' : ''}" onclick="navMonth('shokai','${m.ym}')">
+      <div class="mo-name">${m.label}</div>
+      <div class="mo-amt">${m.total < 0 ? '-' : ''}${yen(m.total)}</div>
+      <div class="mo-meta">${m.count}件${m.co ? ` / CO${m.co}` : ''}</div>
+    </div>
+  `).join('');
+
+  document.getElementById('shokai-inner').innerHTML = `
+    <div class="card">
+      <div class="card-label">総売上（累計）</div>
+      <div class="card-amount">${yen(total)}</div>
+    </div>
+    <div class="month-card">
+      <div class="month-title">${ymLabel(cur)} の売上</div>
+      <div class="month-total">${yen(curTotal)}</div>
+      <div class="pay-row">
+        <div class="pay-item cash">
+          <div class="pay-label">現金振込</div>
+          <div class="pay-amt">${yen(curCash)}</div>
+        </div>
+        <div class="pay-item credit">
+          <div class="pay-label">クレジットカード</div>
+          <div class="pay-amt">${yen(curCredit)}</div>
+        </div>
+      </div>
+    </div>
+    <div class="month-scroll-wrap">
+      <div class="month-scroll-label">${new Date().getFullYear()}年 月別売上</div>
+      <div class="month-scroll">${mblocks}</div>
+    </div>
+  `;
+}
+
+// ────────────────────────────────────────────
+//  受託売上 Detail
+// ────────────────────────────────────────────
+function buildJutakuMonths(rows) {
+  const cur = nowYM();
+  const now = new Date();
+  const year = now.getFullYear();
+  const months = [];
+  for (let m = now.getMonth() + 1; m >= 1; m--) {
+    const ym = `${year}-${String(m).padStart(2, '0')}`;
+    const mrs = rows.filter(r => getYM(r['完了日'] || r['登録日時']) === ym);
+    const total = mrs.reduce((s, r) => s + Number(r['案件単価'] || 0), 0);
+    months.push({ ym, label: `${m}月`, total, count: mrs.length, isCur: ym === cur });
+  }
+  return months;
+}
+
+function renderJutaku() {
+  if (!data) return;
+  const rows = data.jutaku || [];
+  const total = rows.reduce((s, r) => s + Number(r['案件単価'] || 0), 0);
+
+  const cur = nowYM();
+  const curRows = rows.filter(r => getYM(r['完了日'] || r['登録日時']) === cur);
+  const curTotal = curRows.reduce((s, r) => s + Number(r['案件単価'] || 0), 0);
+
+  const months = buildJutakuMonths(rows);
+  const mblocks = months.map(m => `
+    <div class="mo-block ${m.isCur ? 'cur' : ''}" onclick="navMonth('jutaku','${m.ym}')">
+      <div class="mo-name">${m.label}</div>
+      <div class="mo-amt">${yen(m.total)}</div>
+      <div class="mo-meta">${m.count}件</div>
+    </div>
+  `).join('');
+
+  document.getElementById('jutaku-inner').innerHTML = `
+    <div class="card">
+      <div class="card-label">総売上（累計）</div>
+      <div class="card-amount">${yen(total)}</div>
+    </div>
+    <div class="month-card">
+      <div class="month-title">${ymLabel(cur)} の売上</div>
+      <div class="month-total">${yen(curTotal)}</div>
+    </div>
+    <div class="month-scroll-wrap">
+      <div class="month-scroll-label">${new Date().getFullYear()}年 月別売上</div>
+      <div class="month-scroll">${mblocks}</div>
+    </div>
+  `;
+}
+
+// ────────────────────────────────────────────
+//  月次 Detail
+// ────────────────────────────────────────────
+function renderMonth() {
+  if (!data || !monthCtx) return;
+  const { type, ym } = monthCtx;
+
+  if (type === 'shokai') renderShokaiMonth(ym);
+  else renderJutakuMonth(ym);
+}
+
+function renderShokaiMonth(ym) {
+  const rows = (data.shokai || []).filter(r => getYM(r['入金日'] || r['登録日時']) === ym);
+  const total = rows.reduce((s, r) => s + shokaiAmt(r), 0);
+
+  if (!rows.length) {
+    document.getElementById('month-inner').innerHTML =
+      '<p style="text-align:center;color:var(--text2);padding:60px 20px;">この月のデータはありません</p>';
+    return;
+  }
+
+  const items = rows.map(r => {
+    const isCO = (r['タイプ'] || '通常') === 'クーリングオフ';
+    const amt = Number(r['金額'] || 0);
+    const cash = Number(r['振込金額'] || 0);
+    const credit = Number(r['クレカ金額'] || 0);
+    let pay = '';
+    if (credit > 0 && cash > 0) pay = `クレカ ${yen(credit)}・振込 ${yen(cash)}`;
+    else if (credit > 0) pay = `クレジットカード ${yen(credit)}`;
+    else if (cash > 0) pay = `銀行振込 ${yen(cash)}`;
+    return `
+      <div class="sale-item ${isCO ? 'co' : ''}">
+        <div class="sale-row">
+          <div class="sale-name">${r['登録者名'] || ''}${r['登録者ふりがな'] ? `<br><span style="font-size:11px;font-weight:400;color:var(--text2)">${r['登録者ふりがな']}</span>` : ''}
+            ${isCO ? '<span class="co-badge">CO</span>' : ''}</div>
+          <div class="sale-amt">${isCO ? '-' : ''}${yen(amt)}</div>
+        </div>
+        <div class="sale-meta">
+          紹介者: ${r['紹介者'] || '—'} &nbsp;|&nbsp; ${r['入金日'] || '—'}
+          ${pay ? '<br>' + pay : ''}
+        </div>
+      </div>`;
+  }).join('');
+
+  document.getElementById('month-inner').innerHTML = `
+    <div class="card">
+      <div class="card-label">月間売上</div>
+      <div class="card-amount">${total < 0 ? '-' : ''}${yen(total)}</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px">${rows.length} 件</div>
+    </div>
+    ${items}`;
+}
+
+function renderJutakuMonth(ym) {
+  const rows = (data.jutaku || []).filter(r => getYM(r['完了日'] || r['登録日時']) === ym);
+  const total = rows.reduce((s, r) => s + Number(r['案件単価'] || 0), 0);
+
+  if (!rows.length) {
+    document.getElementById('month-inner').innerHTML =
+      '<p style="text-align:center;color:var(--text2);padding:60px 20px;">この月のデータはありません</p>';
+    return;
+  }
+
+  const items = rows.map(r => {
+    const tantoD = r['担当D'] ? `${r['担当D']} (${yen(Number(r['担当D取分'] || 0))})` : '—';
+    const editor = r['編集者'] ? `${r['編集者']} (${yen(Number(r['編集者取分'] || 0))})` : '—';
+    return `
+      <div class="sale-item">
+        <div class="sale-row">
+          <div class="sale-name">${r['案件名'] || '—'}</div>
+          <div class="sale-amt">${yen(Number(r['案件単価'] || 0))}</div>
+        </div>
+        <div class="sale-meta">
+          取引先: ${r['取引先'] || '—'} &nbsp;|&nbsp; 完了: ${r['完了日'] || '—'}<br>
+          担当D: ${tantoD} &nbsp; 編集者: ${editor}
+        </div>
+      </div>`;
+  }).join('');
+
+  document.getElementById('month-inner').innerHTML = `
+    <div class="card">
+      <div class="card-label">月間売上</div>
+      <div class="card-amount">${yen(total)}</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px">${rows.length} 件</div>
+    </div>
+    ${items}`;
+}
+
+// ────────────────────────────────────────────
+//  Init
+// ────────────────────────────────────────────
+loadData();
+</script>
+</body>
+</html>
