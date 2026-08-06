@@ -24,11 +24,7 @@ module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(200).json({ status: 'ok' });
 
   const body = await readBody(req);
-
-  // LINE に 200 を即返す（リトライ防止・replyToken失効防止）
-  res.status(200).end();
-
-  if (!body || !body.events || body.events.length === 0) return;
+  if (!body || !body.events || body.events.length === 0) return res.status(200).end();
 
   const token = process.env.SALES_LINE_ACCESS_TOKEN || '';
 
@@ -84,6 +80,8 @@ module.exports = async function handler(req, res) {
   } catch (err) {
     console.error('handler error:', err);
   }
+
+  return res.status(200).end();
 };
 
 // ─── パーサー ────────────────────────────────────────────────
