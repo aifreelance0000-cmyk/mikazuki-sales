@@ -34,14 +34,14 @@ module.exports = async function handler(req, res) {
       const text       = event.message.text.trim();
       const replyToken = event.replyToken;
 
-      try {
-        const msgId = event.message.id; // LINE メッセージID（重複防止用）
+      const msgId  = event.message.id;
+      const userId = event.source && event.source.userId;
 
+      try {
         if (/[■◾]/.test(text) && /紹介者/.test(text)) {
-          // 商材売上登録
           const entries = parseSalesMessage(text, false);
           if (!entries.length) {
-            await lineReply(token, replyToken, '⚠️ パースできませんでした。\n■紹介者：〇〇 の形式で送信してください。');
+            await linePush(token, userId, '⚠️ パースできませんでした。\n■紹介者：〇〇 の形式で送信してください。');
             continue;
           }
           let saved = 0;
@@ -51,30 +51,29 @@ module.exports = async function handler(req, res) {
             saved++;
             lines.push(`✅ ${entry.登録者名}  ${yen(entry.金額)}`);
           }
-          await lineReply(token, replyToken, `✅ 売上を ${saved} 件登録しました\n\n` + lines.join('\n'));
+          await linePush(token, userId, `✅ 売上を ${saved} 件登録しました\n\n` + lines.join('\n'));
 
         } else if (/クーリングオフ/.test(text)) {
-          // クーリングオフ登録
           const entries = parseSalesMessage(text, true);
           if (!entries.length) {
-            await lineReply(token, replyToken, '⚠️ パースできませんでした。');
+            await linePush(token, userId, '⚠️ パースできませんでした。');
             continue;
           }
           let saved = 0;
           const lines = [];
           for (const entry of entries) {
-            await callAppsScript({ action: 'addShokaiSale', ...entry });
+            await callAppsScript({ action: 'addShokaiSale', ...entry, _msgId: msgId });
             saved++;
             lines.push(`🔴 ${entry.登録者名}  ${yen(entry.金額)}`);
           }
-          await lineReply(token, replyToken, `⚠️ COを ${saved} 件登録しました\n\n` + lines.join('\n'));
+          await linePush(token, userId, `⚠️ COを ${saved} 件登録しました\n\n` + lines.join('\n'));
 
         } else {
-          await lineReply(token, replyToken, '売上登録は ■紹介者：〇〇 から始まる形式で送信してください。');
+          await linePush(token, userId, '売上登録は ■紹介者：〇〇 から始まる形式で送信してください。');
         }
       } catch (err) {
-        console.error('event process error:', err);
-        await lineReply(token, replyToken, '❌ エラーが発生しました: ' + err.message);
+        console.error('event error:', err);
+        await linePush(token, userId, '❌ エラー: ' + err.message);
       }
     }
   } catch (err) {
@@ -190,11 +189,11 @@ async function callAppsScript(body) {
 
 // ─── LINE Reply ───────────────────────────────────────────────
 
-async function lineReply(token, replyToken, text) {
-  if (!token || !replyToken) return;
-  await fetch('https://api.line.me/v2/bot/message/reply', {
+async function linePush(token, userId, text) {
+  if (!token || !userId) return;
+  await fetch('https://api.line.me/v2/bot/message/push', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-    body: JSON.stringify({ replyToken, messages: [{ type: 'text', text }] })
-  }).catch(e => console.error('reply error:', e.message));
+    body: JSON.stringify({ to: userId, messages: [{ type: 'text', text }] })
+  }).catch(e => console.error('push error:', e.message));
 }
