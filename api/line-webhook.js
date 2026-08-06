@@ -178,7 +178,8 @@ function parseEntry(text, type) {
       }
     } else if (pendingKey) {
       applyField(pendingKey, line);
-      pendingKey = null;
+      // 決済方法は複数行になることがあるため pendingKey を維持（空行で解除）
+      if (!/決済/.test(pendingKey)) pendingKey = null;
     }
   }
 
