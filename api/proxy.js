@@ -1,5 +1,5 @@
 // Vercel Serverless Function — Apps Script プロキシ（売上管理）
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxQRESnVJ9NW_VTCs07g9iK7lsIURJBD4nIdA_4yQi8_5sS2dSEVi0vzOkCEaJcz_U/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzRQs0ezf05NlxkeQc3FZq6h1bsF98v8PuqXdEZzSqIeKDa66xwGQEl7_pPYuC_JXBE/exec';
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
