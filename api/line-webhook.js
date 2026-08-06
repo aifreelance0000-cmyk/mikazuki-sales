@@ -41,7 +41,7 @@ module.exports = async function handler(req, res) {
       }
 
       try {
-        if (/[■◾]/.test(text) && /案件名/.test(text)) {
+        if (/案件名/.test(text) && /取引先|案件単価|担当D/.test(text)) {
           // ── 受託売上 ──────────────────────────────────
           const entry = parseJutakuMessage(text);
           if (!entry) {
