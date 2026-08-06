@@ -25,6 +25,9 @@ module.exports = async function handler(req, res) {
   const body = await readBody(req);
   if (!body || !body.events || body.events.length === 0) return res.status(200).end();
 
+  // LINEに即200を返してリトライを防ぐ（処理はこの後続行される）
+  res.status(200).end();
+
   const token = process.env.SALES_LINE_ACCESS_TOKEN || '';
 
   try {
