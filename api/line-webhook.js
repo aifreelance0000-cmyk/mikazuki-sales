@@ -34,6 +34,12 @@ module.exports = async function handler(req, res) {
       const msgId  = event.message.id;
       const userId = event.source && event.source.userId;
 
+      // 5分以上前のイベントは LINE の retry → 無視
+      if (Date.now() - event.timestamp > 5 * 60 * 1000) {
+        console.log('stale event skipped:', event.message.id);
+        continue;
+      }
+
       try {
         if (/[■◾]/.test(text) && /紹介者/.test(text)) {
           const entries = parseSalesMessage(text);
