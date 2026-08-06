@@ -41,7 +41,39 @@ module.exports = async function handler(req, res) {
       }
 
       try {
-        if (/[■◾]/.test(text) && /紹介者/.test(text)) {
+        if (/[■◾]/.test(text) && /案件名/.test(text)) {
+          // ── 受託売上 ──────────────────────────────────
+          const entry = parseJutakuMessage(text);
+          if (!entry) {
+            await linePush(token, userId, '⚠️ パースできませんでした。\n■ 案件名：〇〇 の形式で送信してください。');
+            continue;
+          }
+
+          let isDuplicate = false;
+          try {
+            const r   = await callAppsScript({ action: 'addJutakuSale', ...entry, _msgId: msgId });
+            const txt = await r.text();
+            console.log('GAS jutaku response:', txt.slice(0, 200));
+            const res = JSON.parse(txt);
+            isDuplicate = res.duplicate === true;
+          } catch (e) {
+            console.error('GAS parse error:', e.message);
+          }
+
+          if (isDuplicate) continue;
+
+          const lines = [
+            `📋 ${entry.案件名}`,
+            `💼 ${entry.取引先 || '—'}`,
+            `💰 ${yen(entry.案件単価)}`,
+            `📅 ${entry.完了日 || '—'}`,
+            `👤 担当D: ${entry.担当D || '—'}${entry.担当D取分 ? '  ' + yen(entry.担当D取分) : ''}`,
+          ];
+          if (entry.編集者) lines.push(`✏️ 編集者: ${entry.編集者}${entry.編集者取分 ? '  ' + yen(entry.編集者取分) : ''}`);
+
+          await linePush(token, userId, `🌙 受託案件を登録しました\n\n` + lines.join('\n'));
+
+        } else if (/[■◾]/.test(text) && /紹介者/.test(text)) {
           const entries = parseSalesMessage(text);
           if (!entries.length) {
             await linePush(token, userId, '⚠️ パースできませんでした。\n■紹介者：〇〇 の形式で送信してください。');
@@ -98,6 +130,35 @@ module.exports = async function handler(req, res) {
 
   return res.status(200).end();
 };
+
+// ─── 受託売上パーサー ─────────────────────────────────────────
+
+function parseJutakuMessage(text) {
+  let 案件名 = '', 取引先 = '', 完了日 = '';
+  let 案件単価 = 0, 担当D = '', 担当D取分 = 0, 編集者 = '', 編集者取分 = 0;
+
+  for (const raw of text.split('\n')) {
+    const line = raw.trim();
+    if (!line) continue;
+    const ci = line.search(/[：:]/);
+    if (ci === -1) continue;
+    const key = line.slice(0, ci).replace(/^[■◾️◾🌙✨・\s]+/, '').trim();
+    const val = line.slice(ci + 1).trim();
+    if (!val) continue;
+
+    if      (/案件名/.test(key))             案件名    = val;
+    else if (/取引先/.test(key))             取引先    = val;
+    else if (/完了日/.test(key))             完了日    = parseDt(val);
+    else if (/案件単価|単価/.test(key))      案件単価  = parseAmt(val);
+    else if (/担当D取分|担当d取分/.test(key)) 担当D取分 = parseAmt(val);
+    else if (/担当D|担当d/.test(key))        担当D     = val;
+    else if (/編集者取分/.test(key))         編集者取分 = parseAmt(val);
+    else if (/編集者/.test(key))             編集者    = val;
+  }
+
+  if (!案件名) return null;
+  return { 案件名, 取引先, 完了日, 案件単価, 担当D, 担当D取分, 編集者, 編集者取分 };
+}
 
 // ─── パーサー ────────────────────────────────────────────────
 
