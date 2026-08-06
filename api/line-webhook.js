@@ -34,9 +34,9 @@ module.exports = async function handler(req, res) {
       const msgId  = event.message.id;
       const userId = event.source && event.source.userId;
 
-      // 5分以上前のイベントは LINE の retry → 無視
-      if (Date.now() - event.timestamp > 5 * 60 * 1000) {
-        console.log('stale event skipped:', event.message.id);
+      // 2分以上前のイベントは LINE の retry → 無視
+      if (Date.now() - event.timestamp > 2 * 60 * 1000) {
+        console.log('stale event skipped:', event.message.id, Math.round((Date.now() - event.timestamp) / 1000) + 's old');
         continue;
       }
 
@@ -57,9 +57,13 @@ module.exports = async function handler(req, res) {
             let isDuplicate = false;
             try {
               const r   = await callAppsScript({ action: 'addShokaiSale', ...entry, _msgId: uniqueId });
-              const res = JSON.parse(await r.text());
+              const txt = await r.text();
+              console.log('GAS response:', txt.slice(0, 200));
+              const res = JSON.parse(txt);
               isDuplicate = res.duplicate === true;
-            } catch {}
+            } catch (e) {
+              console.error('GAS parse error:', e.message);
+            }
 
             if (isDuplicate) continue; // 重複 → この件は返信しない
 
