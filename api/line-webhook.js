@@ -2,13 +2,12 @@
 
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz11I4zO4G9jbIX9JGJ18LxIr6Q-Kg5FbPwgnlQ2FeZ-2036PGRib_X82yLGQ1snJqo/exec';
 
-// body を確実に JSON オブジェクトとして取得
 async function readBody(req) {
   try {
     const b = req.body;
     if (b !== undefined && b !== null) {
-      if (Buffer.isBuffer(b))      return JSON.parse(b.toString('utf8'));
-      if (typeof b === 'object')   return b;
+      if (Buffer.isBuffer(b))         return JSON.parse(b.toString('utf8'));
+      if (typeof b === 'object')      return b;
       if (typeof b === 'string' && b) return JSON.parse(b);
     }
     return await new Promise((resolve, reject) => {
@@ -31,42 +30,36 @@ module.exports = async function handler(req, res) {
   try {
     for (const event of body.events) {
       if (event.type !== 'message' || event.message.type !== 'text') continue;
-      const text       = event.message.text.trim();
-      const replyToken = event.replyToken;
-
+      const text   = event.message.text.trim();
       const msgId  = event.message.id;
       const userId = event.source && event.source.userId;
 
       try {
         if (/[■◾]/.test(text) && /紹介者/.test(text)) {
-          const entries = parseSalesMessage(text, false);
+          const entries = parseSalesMessage(text);
           if (!entries.length) {
             await linePush(token, userId, '⚠️ パースできませんでした。\n■紹介者：〇〇 の形式で送信してください。');
             continue;
           }
-          let saved = 0;
-          const lines = [];
-          for (const entry of entries) {
-            await callAppsScript({ action: 'addShokaiSale', ...entry, _msgId: msgId });
-            saved++;
-            lines.push(`✅ ${entry.登録者名}  ${yen(entry.金額)}`);
-          }
-          await linePush(token, userId, `✅ 売上を ${saved} 件登録しました\n\n` + lines.join('\n'));
 
-        } else if (/クーリングオフ/.test(text)) {
-          const entries = parseSalesMessage(text, true);
-          if (!entries.length) {
-            await linePush(token, userId, '⚠️ パースできませんでした。');
-            continue;
-          }
-          let saved = 0;
           const lines = [];
-          for (const entry of entries) {
-            await callAppsScript({ action: 'addShokaiSale', ...entry, _msgId: msgId });
-            saved++;
-            lines.push(`🔴 ${entry.登録者名}  ${yen(entry.金額)}`);
+          for (let i = 0; i < entries.length; i++) {
+            const entry   = entries[i];
+            const uniqueId = entries.length > 1 ? `${msgId}_${i}` : msgId;
+            await callAppsScript({ action: 'addShokaiSale', ...entry, _msgId: uniqueId });
+            const icon  = entry.タイプ === 'クーリングオフ' ? '🔴' : '✅';
+            const label = entry.タイプ === 'クーリングオフ' ? ' (CO)' : '';
+            lines.push(`${icon} ${entry.登録者名}  ${yen(entry.金額)}${label}`);
           }
-          await linePush(token, userId, `⚠️ COを ${saved} 件登録しました\n\n` + lines.join('\n'));
+
+          const normalCount = entries.filter(e => e.タイプ === '通常').length;
+          const coCount     = entries.filter(e => e.タイプ === 'クーリングオフ').length;
+          let header;
+          if (normalCount > 0 && coCount > 0) header = `📋 売上${normalCount}件・CO${coCount}件を登録しました`;
+          else if (coCount > 0)               header = `⚠️ COを ${coCount} 件登録しました`;
+          else                                header = `✅ 売上を ${normalCount} 件登録しました`;
+
+          await linePush(token, userId, header + '\n\n' + lines.join('\n'));
 
         } else {
           await linePush(token, userId, '売上登録は ■紹介者：〇〇 から始まる形式で送信してください。');
@@ -85,54 +78,84 @@ module.exports = async function handler(req, res) {
 
 // ─── パーサー ────────────────────────────────────────────────
 
-function parseSalesMessage(text, isCO) {
-  const type = isCO ? 'クーリングオフ' : '通常';
-  const lineArr = text.split('\n');
-  const parts = [];
-  let buf = [], started = false;
+// 1メッセージに通常・CO混在に対応。「クーリングオフ」という文字が出た後の
+// ◾紹介者ブロックを CO として扱う。
+function parseSalesMessage(text) {
+  const allLines = text.split('\n');
+  const blocks   = []; // { lines: string[], type: string }
 
-  for (const line of lineArr) {
+  let currentCO    = false;
+  let blockLines   = null;
+  let blockType    = '通常';
+
+  for (const line of allLines) {
+    if (/クーリングオフ/.test(line)) currentCO = true;
+
     if (/[■◾]/.test(line) && /紹介者/.test(line)) {
-      if (started && buf.length) parts.push(buf.join('\n'));
-      buf = [line]; started = true;
-    } else if (started) {
-      buf.push(line);
+      if (blockLines !== null) blocks.push({ lines: blockLines, type: blockType });
+      blockType  = currentCO ? 'クーリングオフ' : '通常';
+      blockLines = [line];
+    } else if (blockLines !== null) {
+      blockLines.push(line);
     }
   }
-  if (buf.length) parts.push(buf.join('\n'));
-  if (!parts.length) parts.push(text); // フォールバック
+  if (blockLines !== null) blocks.push({ lines: blockLines, type: blockType });
 
-  return parts.map(p => parseEntry(p, type)).filter(e => e && e.登録者名);
+  return blocks
+    .map(b => parseEntry(b.lines.join('\n'), b.type))
+    .filter(e => e && e.登録者名);
 }
 
+// インライン形式 (◾key：value) と複数行形式 (◾key\n value) の両方に対応。
 function parseEntry(text, type) {
   let 紹介者 = '', 登録者名 = '', 登録者ふりがな = '';
   let 金額 = 0, 入金日 = '', rawDecision = '';
   let クレカ金額 = 0, 振込金額 = 0;
   const methods = [];
 
-  for (const raw of text.split('\n')) {
-    const line = raw.trim();
-    if (!line) continue;
-    const ci = line.search(/[：:]/);
-    if (ci === -1) continue;
-    const key = line.slice(0, ci).replace(/^[■◾️◾・\s]+/, '').trim();
-    const val = line.slice(ci + 1).trim();
-    if (!val) continue;
+  let pendingKey = null;
 
-    if      (/紹介者/.test(key))                      紹介者 = val.replace(/さん$/, '').trim();
-    else if (/登録者名|氏名|フルネーム/.test(key)) {
+  function applyField(key, val) {
+    if (!val) return;
+    if      (/紹介者/.test(key))               紹介者 = val.replace(/さん$/, '').trim();
+    else if (/登録者|氏名|フルネーム/.test(key)) {
       const m = val.match(/^(.+?)[（(](.+?)[）)]/);
       if (m) { 登録者名 = m[1].trim(); 登録者ふりがな = m[2].trim(); }
       else     登録者名 = val.trim();
     }
-    else if (/ふりがな|フリガナ/.test(key))           登録者ふりがな = val.trim();
-    else if (/金額/.test(key))                        金額 = parseAmt(val);
-    else if (/入金日/.test(key))                      入金日 = parseDt(val);
+    else if (/ふりがな|フリガナ/.test(key))     登録者ふりがな = val.trim();
+    else if (/金額/.test(key))                  金額 = parseAmt(val);
+    else if (/入金日/.test(key))                入金日 = parseDt(val);
     else if (/決済/.test(key)) {
       rawDecision = val.trim();
       const p = parsePayment(val);
-      if (p.method) { methods.push(p.method); if (p.isCredit) クレカ金額 += p.amount; else 振込金額 += p.amount; }
+      if (p.method) {
+        methods.push(p.method);
+        if (p.isCredit) クレカ金額 += p.amount;
+        else            振込金額   += p.amount;
+      }
+    }
+  }
+
+  for (const raw of text.split('\n')) {
+    const line = raw.trim();
+    if (!line) { pendingKey = null; continue; }
+
+    if (/^[■◾]/.test(line)) {
+      const ci = line.search(/[：:]/);
+      if (ci !== -1) {
+        // インライン形式
+        const key = line.slice(0, ci).replace(/^[■◾️◾・\s]+/, '').trim();
+        const val = line.slice(ci + 1).trim();
+        if (val) { applyField(key, val); pendingKey = null; }
+        else       pendingKey = key;
+      } else {
+        // 複数行形式（次行が値）
+        pendingKey = line.replace(/^[■◾️◾・\s]+/, '').trim();
+      }
+    } else if (pendingKey) {
+      applyField(pendingKey, line);
+      pendingKey = null;
     }
   }
 
@@ -187,7 +210,7 @@ async function callAppsScript(body) {
   return r1;
 }
 
-// ─── LINE Reply ───────────────────────────────────────────────
+// ─── LINE Push ───────────────────────────────────────────────
 
 async function linePush(token, userId, text) {
   if (!token || !userId) {
