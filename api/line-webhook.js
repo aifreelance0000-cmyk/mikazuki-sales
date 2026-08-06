@@ -34,8 +34,8 @@ module.exports = async function handler(req, res) {
       const msgId  = event.message.id;
       const userId = event.source && event.source.userId;
 
-      // 2分以上前のイベントは LINE の retry → 無視
-      if (Date.now() - event.timestamp > 2 * 60 * 1000) {
+      // 45秒以上前のイベントは LINE の retry → 無視（LINEの初回リトライは60秒後）
+      if (Date.now() - event.timestamp > 45 * 1000) {
         console.log('stale event skipped:', event.message.id, Math.round((Date.now() - event.timestamp) / 1000) + 's old');
         continue;
       }
