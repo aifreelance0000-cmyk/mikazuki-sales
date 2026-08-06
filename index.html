@@ -26,8 +26,6 @@
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic', sans-serif;
       min-height: 100vh;
-      max-width: 600px;
-      margin: 0 auto;
     }
 
     /* ── Header ── */
@@ -35,9 +33,14 @@
       position: sticky; top: 0;
       background: var(--bg);
       border-bottom: 1px solid var(--border);
-      padding: 14px 18px;
-      display: flex; align-items: center; gap: 10px;
+      padding: 0 18px;
       z-index: 100;
+    }
+    .hdr-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 14px 0;
+      display: flex; align-items: center; gap: 10px;
     }
     .hdr h1 { font-size: 17px; font-weight: 700; }
     .back-btn {
@@ -61,7 +64,34 @@
     .reload-btn:active { opacity: 0.7; }
 
     /* ── Layout ── */
-    .main { padding: 18px; }
+    .main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 18px;
+    }
+    @media (min-width: 768px) {
+      .main { padding: 24px 32px; }
+    }
+
+    /* ── Desktop 2-column grids ── */
+    .sec-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+    @media (min-width: 640px) {
+      .sec-grid { grid-template-columns: 1fr 1fr; }
+    }
+
+    .sales-list {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+    @media (min-width: 768px) {
+      .sales-list { grid-template-columns: 1fr 1fr; }
+      .sales-list .sale-item { margin-bottom: 0; }
+    }
 
     /* ── Screen routing ── */
     .screen { display: none; }
@@ -218,9 +248,11 @@
 <body>
 
 <div class="hdr">
-  <button class="back-btn" id="backBtn" onclick="goBack()">← 戻る</button>
-  <h1 id="pageTitle">売上管理</h1>
-  <button class="reload-btn" onclick="loadData()">↻ 更新</button>
+  <div class="hdr-inner">
+    <button class="back-btn" id="backBtn" onclick="goBack()">← 戻る</button>
+    <h1 id="pageTitle">売上管理</h1>
+    <button class="reload-btn" onclick="loadData()">↻ 更新</button>
+  </div>
 </div>
 
 <!-- Dashboard -->
@@ -404,21 +436,23 @@ function renderDash() {
       <div class="card-label">総合売上</div>
       <div class="card-amount">${yen(grand)}</div>
     </div>
-    <div class="sec-card" onclick="navShokai()">
-      <div class="sec-info">
-        <div class="sec-label">商材売上</div>
-        <div class="sec-amount">${yen(shokaiTotal)}</div>
-        <div class="sec-sub">${shokaiCount} 件</div>
+    <div class="sec-grid">
+      <div class="sec-card" onclick="navShokai()">
+        <div class="sec-info">
+          <div class="sec-label">商材売上</div>
+          <div class="sec-amount">${yen(shokaiTotal)}</div>
+          <div class="sec-sub">${shokaiCount} 件</div>
+        </div>
+        <div class="chevron">›</div>
       </div>
-      <div class="chevron">›</div>
-    </div>
-    <div class="sec-card" onclick="navJutaku()">
-      <div class="sec-info">
-        <div class="sec-label">受託売上</div>
-        <div class="sec-amount">${yen(jutakuTotal)}</div>
-        <div class="sec-sub">${jutakuCount} 件</div>
+      <div class="sec-card" onclick="navJutaku()">
+        <div class="sec-info">
+          <div class="sec-label">受託売上</div>
+          <div class="sec-amount">${yen(jutakuTotal)}</div>
+          <div class="sec-sub">${jutakuCount} 件</div>
+        </div>
+        <div class="chevron">›</div>
       </div>
-      <div class="chevron">›</div>
     </div>
   `;
 }
@@ -605,7 +639,7 @@ function renderShokaiMonth(ym) {
         </div>
       </div>
     </div>
-    ${items}`;
+    <div class="sales-list">${items}</div>`;
 }
 
 function renderJutakuMonth(ym) {
@@ -640,7 +674,7 @@ function renderJutakuMonth(ym) {
       <div class="card-amount">${yen(total)}</div>
       <div style="font-size:12px;color:var(--text2);margin-top:4px">${rows.length} 件</div>
     </div>
-    ${items}`;
+    <div class="sales-list">${items}</div>`;
 }
 
 // ────────────────────────────────────────────
