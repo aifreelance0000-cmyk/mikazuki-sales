@@ -43,14 +43,27 @@ module.exports = async function handler(req, res) {
           }
 
           const lines = [];
+          let saved = 0;
           for (let i = 0; i < entries.length; i++) {
-            const entry   = entries[i];
+            const entry    = entries[i];
             const uniqueId = entries.length > 1 ? `${msgId}_${i}` : msgId;
-            await callAppsScript({ action: 'addShokaiSale', ...entry, _msgId: uniqueId });
+
+            let isDuplicate = false;
+            try {
+              const r   = await callAppsScript({ action: 'addShokaiSale', ...entry, _msgId: uniqueId });
+              const res = JSON.parse(await r.text());
+              isDuplicate = res.duplicate === true;
+            } catch {}
+
+            if (isDuplicate) continue; // 重複 → この件は返信しない
+
+            saved++;
             const icon  = entry.タイプ === 'クーリングオフ' ? '🔴' : '✅';
             const label = entry.タイプ === 'クーリングオフ' ? ' (CO)' : '';
             lines.push(`${icon} ${entry.登録者名}  ${yen(entry.金額)}${label}`);
           }
+
+          if (saved === 0) continue; // 全件重複 → 返信しない
 
           const normalCount = entries.filter(e => e.タイプ === '通常').length;
           const coCount     = entries.filter(e => e.タイプ === 'クーリングオフ').length;
