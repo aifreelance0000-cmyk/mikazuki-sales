@@ -3,6 +3,9 @@
   "trailingSlash": false,
   "functions": {
     "api/line-webhook.js": {
+      "maxDuration": 60
+    },
+    "api/warmup.js": {
       "maxDuration": 30
     }
   }
