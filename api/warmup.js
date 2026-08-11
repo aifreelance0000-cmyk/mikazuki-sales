@@ -1,7 +1,7 @@
 // GAS ウォームアップエンドポイント
 // cron-job.org などの外部cronから5分ごとに呼び出す
 
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwphOMlo-gg__OIQ9sQux2-JGdK7M2QMDoImBzCsB1GR69rHI9MLL9fCqsQSSGgkLrb/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxJ3FJcnCyKn7oL7JcSfBQG1g9C9BZ3Zy7Fo2mMRFCBJqijS7kUL7d-O6fdfVMOzzSA/exec';
 
 module.exports = async function handler(req, res) {
   const start = Date.now();
