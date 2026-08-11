@@ -25,9 +25,6 @@ module.exports = async function handler(req, res) {
   const body = await readBody(req);
   if (!body || !body.events || body.events.length === 0) return res.status(200).end();
 
-  // LINEに即200を返してリトライを防ぐ（処理はこの後続行される）
-  res.status(200).end();
-
   const token = process.env.SALES_LINE_ACCESS_TOKEN || '';
 
   try {
@@ -326,11 +323,12 @@ function yen(n) { return '¥' + Number(n).toLocaleString('ja-JP'); }
 async function callAppsScript(body) {
   const r1 = await fetch(APPS_SCRIPT_URL, {
     method: 'POST', headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify(body), redirect: 'manual'
+    body: JSON.stringify(body), redirect: 'manual',
+    signal: AbortSignal.timeout(20000),
   });
   if (r1.status === 302 || r1.status === 301) {
     const loc = r1.headers.get('location');
-    if (loc) return fetch(loc, { method: 'GET' });
+    if (loc) return fetch(loc, { method: 'GET', signal: AbortSignal.timeout(20000) });
   }
   return r1;
 }
