@@ -108,7 +108,10 @@ module.exports = async function handler(req, res) {
             lines.push(`${icon} ${entry.登録者名}  ${yen(entry.金額)}${label}`);
           }
 
-          if (saved === 0) continue; // 全件重複 → 返信しない
+          if (saved === 0) {
+            await linePush(token, userId, '⚠️ すでに登録済みのデータです。\nスプレッドシートを確認してください。');
+            continue;
+          }
 
           const normalCount = entries.filter(e => e.タイプ === '通常').length;
           const coCount     = entries.filter(e => e.タイプ === 'クーリングオフ').length;
