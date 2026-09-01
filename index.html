@@ -333,7 +333,10 @@ function shokaiSign(row) {
 }
 
 function shokaiAmt(row) {
-  return Number(row['金額'] || 0) * shokaiSign(row);
+  const gross = Number(row['金額'] || 0);
+  const credit = Number(row['クレカ金額'] || 0);
+  const net = gross - Math.round(credit * 0.036);
+  return net * shokaiSign(row);
 }
 
 // ────────────────────────────────────────────
@@ -605,9 +608,10 @@ function renderShokaiMonth(ym) {
 
   const items = rows.map(r => {
     const isCO = (r['タイプ'] || '通常') === 'クーリングオフ';
-    const amt = Number(r['金額'] || 0);
+    const gross = Number(r['金額'] || 0);
     const cash = Number(r['振込金額'] || 0);
     const credit = Number(r['クレカ金額'] || 0);
+    const netAmt = gross - Math.round(credit * 0.036);
     let pay = '';
     if (credit > 0 && cash > 0) pay = `クレカ ${yen(creditNet(credit))}・振込 ${yen(cash)}`;
     else if (credit > 0) pay = `クレジットカード ${yen(creditNet(credit))}`;
@@ -617,7 +621,7 @@ function renderShokaiMonth(ym) {
         <div class="sale-row">
           <div class="sale-name">${r['登録者名'] || ''}${r['登録者ふりがな'] ? `<br><span style="font-size:11px;font-weight:400;color:var(--text2)">${r['登録者ふりがな']}</span>` : ''}
             ${isCO ? '<span class="co-badge">CO</span>' : ''}</div>
-          <div class="sale-amt">${isCO ? '-' : ''}${yen(amt)}</div>
+          <div class="sale-amt">${isCO ? '-' : ''}${yen(netAmt)}</div>
         </div>
         <div class="sale-meta">
           紹介者: ${r['紹介者'] || '—'} &nbsp;|&nbsp; ${r['入金日'] || '—'}
