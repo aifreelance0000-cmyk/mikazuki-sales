@@ -297,6 +297,9 @@ function yen(n) {
   const abs = Math.abs(Number(n));
   return '¥' + abs.toLocaleString('ja-JP');
 }
+function creditNet(n) {
+  return Math.round(Number(n) * (1 - 0.036));
+}
 
 function getYM(dateVal) {
   if (!dateVal) return '';
@@ -512,8 +515,8 @@ function renderShokai() {
           <div class="pay-amt">${yen(curCash)}</div>
         </div>
         <div class="pay-item credit">
-          <div class="pay-label">クレジットカード</div>
-          <div class="pay-amt">${yen(curCredit)}</div>
+          <div class="pay-label">クレジットカード（手数料3.6%控除後）</div>
+          <div class="pay-amt">${yen(creditNet(curCredit))}</div>
         </div>
       </div>
     </div>
@@ -606,8 +609,8 @@ function renderShokaiMonth(ym) {
     const cash = Number(r['振込金額'] || 0);
     const credit = Number(r['クレカ金額'] || 0);
     let pay = '';
-    if (credit > 0 && cash > 0) pay = `クレカ ${yen(credit)}・振込 ${yen(cash)}`;
-    else if (credit > 0) pay = `クレジットカード ${yen(credit)}`;
+    if (credit > 0 && cash > 0) pay = `クレカ ${yen(creditNet(credit))}・振込 ${yen(cash)}`;
+    else if (credit > 0) pay = `クレジットカード ${yen(creditNet(credit))}`;
     else if (cash > 0) pay = `銀行振込 ${yen(cash)}`;
     return `
       <div class="sale-item ${isCO ? 'co' : ''}">
@@ -634,8 +637,8 @@ function renderShokaiMonth(ym) {
           <div class="pay-amt">${yen(cashTotal)}</div>
         </div>
         <div class="pay-item credit">
-          <div class="pay-label">クレジットカード</div>
-          <div class="pay-amt">${yen(creditTotal)}</div>
+          <div class="pay-label">クレジットカード（手数料3.6%控除後）</div>
+          <div class="pay-amt">${yen(creditNet(creditTotal))}</div>
         </div>
       </div>
     </div>
